@@ -3,44 +3,57 @@
 //Assignment 4 - Sequence visualization
 
 import java.util.LinkedList;
+import java.util.HashMap;
 import java.io.*;
 import java.lang.*;
 
 //Data source
-final String DATA_FILE = "C:\\Users\\Tim\\Documents\\Biovis\\assignment4\\test.fasta";
+final String DATA_FILE = "C:\\Users\\Tim\\Documents\\Biovis\\assignment4\\hemoglobin.fasta";
 
 //Default Gap Penalty
 final int DEFAULT_GAP = -5;
 
 
 //Graphics Parameters
-final int WIN_X = 600;
-final int WIN_Y = 600;
-color NORMAL_STROKE = color(0,0,0); //black
-color BACKGROUND = color(255,255,255); // white
-color HIGHLIGHT = color(255,255,0); //gold
-int SCALE = 20;
-int STROKE_WEIGHT = 2;
+final int WIN_X = 800;
+final int WIN_Y = 400;
+final int TEXT_SIZE = 18;
+final int VISIBLE_CHARS = 30;
+final int CHAR_X_SPACING = 20;
+final int CHAR_Y_SPACING = 22;
+//Rendering parameters
+final int AVG_WINDOW = 8;// color based on average of entropies +-5 spaces
 
+//Globals
+Alignment a;
 
 //Processing setup function
 void setup(){
-  colorMode(RGB, 255,255,255);
-  stroke(NORMAL_STROKE); // black
-  strokeWeight(STROKE_WEIGHT);
-  fill(NORMAL_STROKE);
   LinkedList<FastaSequence> fs = loadFile(DATA_FILE);
-  Alignment a = fs.get(0).singleAlignment(fs.get(1));
+  a = fs.get(0).singleAlignment(fs.get(2));
   
-  println(a);
+
+  float[] avgs = a.avgEntropies(AVG_WINDOW);
+  for (float f: avgs){
+    println(f);
+  }
+  
   size(WIN_X, WIN_Y);
-  background(BACKGROUND);
+  colorMode(HSB, 100);
+  fill(0,0,100);
   
 }
 
 //Drawing loop
 void draw(){
-
+  colorMode(HSB, 100);
+  fill(0,0,100);
+  noStroke();
+  rectMode(CORNER);
+  rect(0,100,WIN_X, WIN_Y-100);
+  a.colorBar();
+  a.onMouse();
+  
 }
 
 /**
@@ -122,16 +135,16 @@ class FastaSequence {
   
   Alignment singleAlignment(FastaSequence s, int gapPenalty){
     int[][] matrix = this.alignmentMatrix(s, gapPenalty);
-    int a;
-    int b;
-    for (a = 0; a<matrix.length; a++){
-      String se = "";
-      for (b=0; b<matrix[0].length; b++){
-        se = se + String.format ("%5s", matrix[a][b]);
-      }
-      println(se);
-    }
-    
+//    int a;
+//    int b;
+//    for (a = 0; a<matrix.length; a++){
+//      String se = "";
+//      for (b=0; b<matrix[0].length; b++){
+//        se = se + String.format ("%5s", matrix[a][b]);
+//      }
+//      println(se);
+//    }
+//    
     String al1 = "";
     String al2 = "";
     
@@ -140,16 +153,13 @@ class FastaSequence {
     int j = matrix[0].length -1;
     
     while (i > 0 && j > 0){
-      println("(" + i + ", " + j + ")" + matrix[i][j]);
       
       int this_score = matrix[i][j];
       
       int left, up, diag;
       left = matrix[i-1][j];
       up = matrix[i][j-1];
-      
-     
-      
+           
       if (this_score - gapPenalty == left){
         //take a character from seq 1, insert a blank from seq2
         al1 = Character.toString(this.charAt(i-1)) + al1;
@@ -281,15 +291,196 @@ class Alignment {
     
   }//toString()
   
+  //Returns the entropy score for position i in the alignment
+  float entropy(int i){
+    //for counting characters, extensible to any size multiple alignment
+    HashMap<Character,Integer> counts = new HashMap<Character,Integer>();
+    for (String a : alignment){
+      Integer count = counts.get(a.charAt(i));
+      if (count == null){
+        counts.put(a.charAt(i), 1);
+      } else {
+        counts.put(a.charAt(i), count+1);
+      }
+        
+    }
+    //Entropy = -Sum(Cia*log2(Pia))
+    float sum = 0;
+    for (Character c : counts.keySet()){
+      sum += counts.get(c)*log(counts.get(c)/float(this.numSeqs))/log(2);
+    }
+    sum = -sum;
+    
+    return sum;
+    
+  }//entropy
+  
+  float[] avgEntropies(int rangeSize){
+
+    float[] averages = new float[alignment[0].length()];
+    float sum = 0.0;
+    float numValues = rangeSize+1;
+    
+    int i;
+    //First collect the entropies
+    for (i = 0; i < rangeSize+1; i ++){
+      sum += this.entropy(i);
+    }//for i
+    
+    averages[0] = sum/numValues;
+    
+    for (i = 1; i < rangeSize; i ++){
+      //moving average while the range is growing to the correct size
+      numValues += 1;
+      sum += this.entropy(i+rangeSize);
+      averages[i] = sum/numValues;
+    }
+    numValues = rangeSize*2 +1;
+    
+    for (i = rangeSize; i < averages.length - rangeSize; i++){
+      //Moving average while the range is correct
+      sum = sum - this.entropy(i - rangeSize) + this.entropy(i+rangeSize);
+      averages[i] = sum/numValues;
+      
+    }
+    
+    
+    //moving average for final window
+    for (i = averages.length - rangeSize; i < averages.length; i ++){
+      numValues--;
+      sum -= this.entropy(i-rangeSize);
+      averages[i] = sum/numValues;
+      
+    }
+    
+    return averages;
+    
+  }//avgEntropies
+  
+  /**
+    Draws a colorBar showing the moving average of entropy 
+  */
+  
+  void colorBar(){
+    
+    
+    //Get the averages across the range
+    float[] averages = this.avgEntropies(AVG_WINDOW);
+    float maxEnt = max(averages);
+    colorMode(HSB, maxEnt*2);
+    noStroke();
+    float boxes = float(averages.length);
+    float box_width = WIN_X/boxes;
+    
+    //Create a rectangle with colors for the moving average of the entropies
+    rectMode(CORNER);
+    for (int i = 0; i < boxes; i++){
+      fill(0.7*(maxEnt-averages[i]),maxEnt*2,maxEnt*2 - averages[i]);
+      rect(i*box_width,0, box_width, 100);
+      
+    }
+    
+  }//colorBar
+  
+  void onMouse(){
+    float boxes = this.alignment[0].length();
+    float box_width = WIN_X/boxes;
+    
+    if (mouseY < 100){
+      int box_num = floor(mouseX /box_width);
+      showAlignment(box_num);
+    }
+  }
+  
+  //Shows the text based alignment from a given position
+  void showAlignment(int fromPosition){
+    textSize(TEXT_SIZE);
+    colorMode(HSB,1);
+    stroke(0,0,0);
+    fill(0,0,0);
+    
+    int startingIndex = min(max(fromPosition - VISIBLE_CHARS/2, 0), alignment[0].length()-30);
+    
+    
+    int i = 0;
+    
+    //Range labels
+    textAlign(CENTER);
+    text(Integer.toString(startingIndex), 30, 125);
+    text(Integer.toString(startingIndex+VISIBLE_CHARS-1), 30+((VISIBLE_CHARS-1)*CHAR_X_SPACING), 125);
+    
+    
+    for (int c = startingIndex; c < VISIBLE_CHARS + startingIndex; c++){
+      int j = 0;
+      for (String s: this.alignment){        
+        //String txt = Character.toString(s.charAt(c));
+        //text(txt, 30+i*CHAR_X_SPACING, 150+j*CHAR_Y_SPACING);
+        render_AA(s.charAt(c), 30+i*CHAR_X_SPACING, 150+j*CHAR_Y_SPACING, CHAR_X_SPACING, CHAR_Y_SPACING);
+        j++;       
+      }//for s
+      i++;
+    }//for c
+    
+    //String labels
+    textAlign(LEFT);
+    for (int si = 0; si< alignment.length; si++){
+      text(labels[si], 30 + VISIBLE_CHARS*CHAR_X_SPACING, 150+si*CHAR_Y_SPACING);
+      
+    }//for int
+    
+  }
+  
 }//class Alignment
 
+void render_AA(char c, float x, float y, float w, float h){
+  textSize(TEXT_SIZE);
+  rectMode(CENTER);
+  textAlign(CENTER,CENTER);
+  //rectangle color determined by amino acid groups
+  colorMode(RGB,255);
+  color col = aaColor(c);
+  if (col != color(0,0,0)){
+    fill(col);
+    rect(x,y,w,h);
+  }
+  colorMode(HSB,1);
+  stroke(0,0,0);
+  fill(0,0,0);
+  text(Character.toString(c),x,y);
+   
+}
 
+//This is a color scheme similar to the one used by CINEMA, based on the chemical properties of each AA
+color aaColor(char c){
+  if (c=='H' || c== 'K' || c == 'R'){
+    //Polar positive, Blue
+    return color(30,0,255);
+  } else if (c=='D' || c=='E') {
+    //Polar negative, Red
+    return color(255,0,0);
+  } else if (c=='S' || c== 'T' || c=='N' || c=='Q') {
+    //Polar neutral, green
+    return color(0,255,0);
+  } else if (c=='A' || c=='V' || c=='L' || c=='I' || c=='M') {
+    //Non-polar aliphatic, Grey
+    return color(110,110,110);
+  } else if (c=='P' || c=='G') {
+    //Other, Brown
+    return color(160,82,45);
+  } else if (c =='C') {
+    //Cytosine, yellow
+    return color(255,255,0);
+  } else {
+    return color(0,0,0); // black, denotes error condition, not drawn
+  }
+  
+}
 
 //--------------Outside Code ---------------------------------------/
 // Scoring matrix class, taken (with some comments omitted) from Univesity of Texas:
 //http://www.cs.utexas.edu/~mobios/cs329e/rosetta/src/Blosum.java
 //**I made some slight modifications to shorten the code/ Remove extra error handling 
-// --> Must ensure properly .fasta files or IndexOutofBoundsExceptions will occur
+// --> Must ensure properly formatted .fasta files or IndexOutofBoundsExceptions will occur
 
 final public static class Blosum{
 
