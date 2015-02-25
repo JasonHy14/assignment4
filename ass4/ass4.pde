@@ -30,8 +30,9 @@ void setup(){
   strokeWeight(STROKE_WEIGHT);
   fill(NORMAL_STROKE);
   LinkedList<FastaSequence> fs = loadFile(DATA_FILE);
+  Alignment a = fs.get(0).singleAlignment(fs.get(1));
   
-  println(fs.size());
+  println(a);
   size(WIN_X, WIN_Y);
   background(BACKGROUND);
   
@@ -88,7 +89,7 @@ class FastaSequence {
   for a global alignment between the two sequences using the Blosum-62 matrix at the end of this file.
    */
   
-  int alignmentScore(FastaSequence s, int gapPenalty){
+  int[][] alignmentMatrix(FastaSequence s, int gapPenalty){
     //Array to compute score
     int[][] array = new int[this.length()+1][s.length()+1];
     
@@ -115,14 +116,92 @@ class FastaSequence {
     }
     
     //Return the bottom corner, which is the global alignment score for these sequences
-    return array[this.length()][s.length()];
+    return array;
     
   }
   
+  Alignment singleAlignment(FastaSequence s, int gapPenalty){
+    int[][] matrix = this.alignmentMatrix(s, gapPenalty);
+    int a;
+    int b;
+    for (a = 0; a<matrix.length; a++){
+      String se = "";
+      for (b=0; b<matrix[0].length; b++){
+        se = se + String.format ("%5s", matrix[a][b]);
+      }
+      println(se);
+    }
+    
+    String al1 = "";
+    String al2 = "";
+    
+    //Start in the bottom corner, traceback to 0,0
+    int i = matrix.length -1; 
+    int j = matrix[0].length -1;
+    
+    while (i > 0 && j > 0){
+      println("(" + i + ", " + j + ")" + matrix[i][j]);
+      
+      int this_score = matrix[i][j];
+      
+      int left, up, diag;
+      left = matrix[i-1][j];
+      up = matrix[i][j-1];
+      
+     
+      
+      if (this_score - gapPenalty == left){
+        //take a character from seq 1, insert a blank from seq2
+        al1 = Character.toString(this.charAt(i-1)) + al1;
+        al2 = "-" + al2;
+        i--;
+      } else if (this_score - gapPenalty == up) {
+        //Do the opposite
+        al1 = "-" + al1;
+        al2 = Character.toString(s.charAt(j-1)) + al2;
+        j--;
+      } else {
+        //Take a character from both
+        al1 = Character.toString(this.charAt(i-1)) + al1;
+        al2 = Character.toString(s.charAt(j-1)) + al2;
+        i--;
+        j--;
+      }
+    }//while
+    
+    //Now check to see which string we ran out of, and add the remaining characters
+    if (i ==0) {
+      //this sequence has been used up
+      while (j > 0) {
+        al1 = "-" + al1;
+        al2 = Character.toString(s.charAt(j-1)) + al2;
+        j--;
+       
+      } 
+    } else if(j==0){
+      while (i>0){
+        al1 = Character.toString(this.charAt(i-1)) + al1;
+        al2 = "-" + al2;
+        i--;
+      }
+        
+    }
+    
+    //Now al1 and al2 contain correct sequence alignments
+    return new Alignment(al1, al2, this.getHeading(), s.getHeading());
+    
+    
+    
+  } // singleAlignment
+  
+  
   //Default version
-  int alignmentScore(FastaSequence s){
-    return this.alignmentScore(s, DEFAULT_GAP);
+  Alignment singleAlignment(FastaSequence s){
+    return this.singleAlignment(s,DEFAULT_GAP);
   }
+  
+  
+ 
     
     
 }//class FastaSequence
@@ -174,6 +253,35 @@ LinkedList<FastaSequence> loadFile(String fromFile){
 /**
   Alignment class, capable of holding and drawing an alignment
 */
+
+class Alignment {
+  int numSeqs;
+  String[] alignment;
+  String[] labels;
+  
+  Alignment(String seq1, String seq2, String label1, String label2){
+    this.numSeqs = 2;
+    this.alignment = new String[2];
+    this.labels = new String[2];
+    this.alignment[0] = seq1;
+    this.alignment[1] = seq2;
+    this.labels[0] = label1;
+    this.labels[1] = label2;
+    
+  }//Constructor for pairwise alignment
+  
+  
+  String toString(){
+    String s = "";
+    
+    for (String al: this.alignment) {
+      s += al + "\n";
+    }
+    return s;
+    
+  }//toString()
+  
+}//class Alignment
 
 
 
