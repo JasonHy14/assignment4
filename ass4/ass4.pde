@@ -26,6 +26,8 @@ final int AVG_WINDOW = 8;// color based on average of entropies +-5 spaces
 
 //Globals
 Alignment a;
+int LAST_BOX = 0; //stores most recent box to focus on
+
 
 //Processing setup function
 void setup(){
@@ -388,8 +390,12 @@ class Alignment {
     
     if (mouseY < 100){
       int box_num = floor(mouseX /box_width);
+      LAST_BOX = box_num;
       showAlignment(box_num);
+    } else {
+      showAlignment(LAST_BOX);
     }
+    
   }
   
   //Shows the text based alignment from a given position
@@ -422,7 +428,7 @@ class Alignment {
     }//for c
     
     //String labels
-    textAlign(LEFT);
+    textAlign(LEFT,CENTER);
     for (int si = 0; si< alignment.length; si++){
       text(labels[si], 30 + VISIBLE_CHARS*CHAR_X_SPACING, 150+si*CHAR_Y_SPACING);
       
