@@ -8,10 +8,10 @@ import java.io.*;
 import java.lang.*;
 
 //Data source
-final String DATA_FILE = "C:\\Users\\Tim\\Documents\\Biovis\\assignment4\\hemoglobin.fasta";
+final String DATA_FILE = "C:\\Users\\Tim\\Documents\\Biovis\\assignment4\\dystrophin.fasta";
 
 //Default Gap Penalty
-final int DEFAULT_GAP = -5;
+final int DEFAULT_GAP = -3;
 
 
 //Graphics Parameters
@@ -21,6 +21,7 @@ final int TEXT_SIZE = 18;
 final int VISIBLE_CHARS = 30;
 final int CHAR_X_SPACING = 20;
 final int CHAR_Y_SPACING = 22;
+
 //Rendering parameters
 final int AVG_WINDOW = 8;// color based on average of entropies +-5 spaces
 
@@ -32,13 +33,7 @@ int LAST_BOX = 0; //stores most recent box to focus on
 //Processing setup function
 void setup(){
   LinkedList<FastaSequence> fs = loadFile(DATA_FILE);
-  a = fs.get(0).singleAlignment(fs.get(2));
-  
-
-  float[] avgs = a.avgEntropies(AVG_WINDOW);
-  for (float f: avgs){
-    println(f);
-  }
+  a = fs.get(0).singleAlignment(fs.get(1));
   
   size(WIN_X, WIN_Y);
   colorMode(HSB, 100);
@@ -137,16 +132,7 @@ class FastaSequence {
   
   Alignment singleAlignment(FastaSequence s, int gapPenalty){
     int[][] matrix = this.alignmentMatrix(s, gapPenalty);
-//    int a;
-//    int b;
-//    for (a = 0; a<matrix.length; a++){
-//      String se = "";
-//      for (b=0; b<matrix[0].length; b++){
-//        se = se + String.format ("%5s", matrix[a][b]);
-//      }
-//      println(se);
-//    }
-//    
+   
     String al1 = "";
     String al2 = "";
     
@@ -401,13 +387,22 @@ class Alignment {
   //Shows the text based alignment from a given position
   void showAlignment(int fromPosition){
     textSize(TEXT_SIZE);
-    colorMode(HSB,1);
-    stroke(0,0,0);
-    fill(0,0,0);
+    colorMode(HSB,255);
+    stroke(0,0,0,120);
+    fill(0,0,0,50);
     
     int startingIndex = min(max(fromPosition - VISIBLE_CHARS/2, 0), alignment[0].length()-30);
+    //opaque rectangle on top of color bar
+    rectMode(CORNER);
+    float boxes  = float(this.alignment[0].length());
+    float box_width = WIN_X/boxes;
+    rect(startingIndex*box_width, 0, VISIBLE_CHARS*box_width,100);
     
     
+    
+    
+    stroke(0,0,0);
+    fill(0,0,0);
     int i = 0;
     
     //Range labels
@@ -470,11 +465,14 @@ color aaColor(char c){
   } else if (c=='A' || c=='V' || c=='L' || c=='I' || c=='M') {
     //Non-polar aliphatic, Grey
     return color(110,110,110);
+  } else if (c=='F'|| c=='W'||c=='Y'){
+    //Non-polar aromatic
+    return color(204,0,204);
   } else if (c=='P' || c=='G') {
     //Other, Brown
     return color(160,82,45);
   } else if (c =='C') {
-    //Cytosine, yellow
+    //Cysteine, yellow
     return color(255,255,0);
   } else {
     return color(0,0,0); // black, denotes error condition, not drawn
