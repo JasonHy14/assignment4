@@ -18,6 +18,8 @@ final int DEFAULT_GAP = -3;
 final int WIN_X = 800;
 final int WIN_Y = 400;
 final int TEXT_SIZE = 18;
+
+//Number of visible characters in the alignment, and spacing
 final int VISIBLE_CHARS = 30;
 final int CHAR_X_SPACING = 20;
 final int CHAR_Y_SPACING = 22;
@@ -33,6 +35,8 @@ int LAST_BOX = 0; //stores most recent box to focus on
 //Processing setup function
 void setup(){
   LinkedList<FastaSequence> fs = loadFile(DATA_FILE);
+  
+  //File only has two sequences, you can modify these to suit align other proteins
   a = fs.get(0).singleAlignment(fs.get(1));
   
   size(WIN_X, WIN_Y);
@@ -130,9 +134,16 @@ class FastaSequence {
     
   }
   
+  /**
+    Perform a single alignment of two FastaSequences, with the given gap penalty,
+    and return the alignment. 
+  */
   Alignment singleAlignment(FastaSequence s, int gapPenalty){
+    
+    //scoring matrix, for traceback algorithm
     int[][] matrix = this.alignmentMatrix(s, gapPenalty);
    
+   //initialize empty alignment
     String al1 = "";
     String al2 = "";
     
@@ -140,6 +151,7 @@ class FastaSequence {
     int i = matrix.length -1; 
     int j = matrix[0].length -1;
     
+    //While we haven't hit the edge of the board 
     while (i > 0 && j > 0){
       
       int this_score = matrix[i][j];
@@ -147,7 +159,9 @@ class FastaSequence {
       int left, up, diag;
       left = matrix[i-1][j];
       up = matrix[i][j-1];
-           
+      
+      
+      //Check to see which score resulted in the current one 
       if (this_score - gapPenalty == left){
         //take a character from seq 1, insert a blank from seq2
         al1 = Character.toString(this.charAt(i-1)) + al1;
@@ -188,8 +202,6 @@ class FastaSequence {
     //Now al1 and al2 contain correct sequence alignments
     return new Alignment(al1, al2, this.getHeading(), s.getHeading());
     
-    
-    
   } // singleAlignment
   
   
@@ -198,13 +210,9 @@ class FastaSequence {
     return this.singleAlignment(s,DEFAULT_GAP);
   }
   
-  
- 
-    
-    
 }//class FastaSequence
 
-//Loading method for FastaSequences
+//Loading method for FastaSequences (identical to assignment2)
 LinkedList<FastaSequence> loadFile(String fromFile){
   LinkedList<FastaSequence> l = new LinkedList<FastaSequence>();
   BufferedReader br;
@@ -253,10 +261,12 @@ LinkedList<FastaSequence> loadFile(String fromFile){
 */
 
 class Alignment {
-  int numSeqs;
-  String[] alignment;
-  String[] labels;
   
+  int numSeqs; //Number of sequences
+  String[] alignment; //parallel alignment strings, e.g. "MRA--A"
+  String[] labels; //Labels for each sequence in alignment
+  
+  //Constructor
   Alignment(String seq1, String seq2, String label1, String label2){
     this.numSeqs = 2;
     this.alignment = new String[2];
@@ -268,7 +278,7 @@ class Alignment {
     
   }//Constructor for pairwise alignment
   
-  
+  //For debugging
   String toString(){
     String s = "";
     
@@ -281,6 +291,7 @@ class Alignment {
   
   //Returns the entropy score for position i in the alignment
   float entropy(int i){
+    
     //for counting characters, extensible to any size multiple alignment
     HashMap<Character,Integer> counts = new HashMap<Character,Integer>();
     for (String a : alignment){
@@ -292,13 +303,13 @@ class Alignment {
       }
         
     }
-    //Entropy = -Sum(Cia*log2(Pia))
+    
+    //Entropy = -Sum(C*log2(prob(char==c))
     float sum = 0;
     for (Character c : counts.keySet()){
       sum += counts.get(c)*log(counts.get(c)/float(this.numSeqs))/log(2);
     }
     sum = -sum;
-    
     return sum;
     
   }//entropy
@@ -323,15 +334,14 @@ class Alignment {
       sum += this.entropy(i+rangeSize);
       averages[i] = sum/numValues;
     }
+    
     numValues = rangeSize*2 +1;
     
-    for (i = rangeSize; i < averages.length - rangeSize; i++){
-      //Moving average while the range is correct
+    //Moving average while the range is correct
+    for (i = rangeSize; i < averages.length - rangeSize; i++){     
       sum = sum - this.entropy(i - rangeSize) + this.entropy(i+rangeSize);
-      averages[i] = sum/numValues;
-      
+      averages[i] = sum/numValues;      
     }
-    
     
     //moving average for final window
     for (i = averages.length - rangeSize; i < averages.length; i ++){
@@ -354,15 +364,20 @@ class Alignment {
     
     //Get the averages across the range
     float[] averages = this.avgEntropies(AVG_WINDOW);
+    
+    //useful for setting the color range
     float maxEnt = max(averages);
     colorMode(HSB, maxEnt*2);
     noStroke();
+    
+    //width of each element in the averages
     float boxes = float(averages.length);
     float box_width = WIN_X/boxes;
     
     //Create a rectangle with colors for the moving average of the entropies
     rectMode(CORNER);
     for (int i = 0; i < boxes; i++){
+      //color based on scale between red (large entropy) and green (low entropy)
       fill(0.7*(maxEnt-averages[i]),maxEnt*2,maxEnt*2 - averages[i]);
       rect(i*box_width,0, box_width, 100);
       
@@ -370,15 +385,18 @@ class Alignment {
     
   }//colorBar
   
+  //Update view based on mouse location
   void onMouse(){
     float boxes = this.alignment[0].length();
     float box_width = WIN_X/boxes;
     
+    //If the mouse is on the complete sequence view, update alignment to view section
     if (mouseY < 100){
       int box_num = floor(mouseX /box_width);
       LAST_BOX = box_num;
       showAlignment(box_num);
     } else {
+      //Otherwise, show the most recent selection
       showAlignment(LAST_BOX);
     }
     
@@ -386,21 +404,23 @@ class Alignment {
   
   //Shows the text based alignment from a given position
   void showAlignment(int fromPosition){
+    
     textSize(TEXT_SIZE);
+    //Opacity settings for selection rectangle
     colorMode(HSB,255);
     stroke(0,0,0,120);
     fill(0,0,0,50);
     
+    //Where to start the sequence view
     int startingIndex = min(max(fromPosition - VISIBLE_CHARS/2, 0), alignment[0].length()-30);
+    
     //opaque rectangle on top of color bar
     rectMode(CORNER);
     float boxes  = float(this.alignment[0].length());
     float box_width = WIN_X/boxes;
     rect(startingIndex*box_width, 0, VISIBLE_CHARS*box_width,100);
     
-    
-    
-    
+    //Revert to black styling
     stroke(0,0,0);
     fill(0,0,0);
     int i = 0;
@@ -410,12 +430,10 @@ class Alignment {
     text(Integer.toString(startingIndex), 30, 125);
     text(Integer.toString(startingIndex+VISIBLE_CHARS-1), 30+((VISIBLE_CHARS-1)*CHAR_X_SPACING), 125);
     
-    
+    //Render each character in each alignment
     for (int c = startingIndex; c < VISIBLE_CHARS + startingIndex; c++){
       int j = 0;
       for (String s: this.alignment){        
-        //String txt = Character.toString(s.charAt(c));
-        //text(txt, 30+i*CHAR_X_SPACING, 150+j*CHAR_Y_SPACING);
         render_AA(s.charAt(c), 30+i*CHAR_X_SPACING, 150+j*CHAR_Y_SPACING, CHAR_X_SPACING, CHAR_Y_SPACING);
         j++;       
       }//for s
@@ -433,17 +451,23 @@ class Alignment {
   
 }//class Alignment
 
+//Render one amino acid for alignment
 void render_AA(char c, float x, float y, float w, float h){
   textSize(TEXT_SIZE);
   rectMode(CENTER);
   textAlign(CENTER,CENTER);
+  
   //rectangle color determined by amino acid groups
   colorMode(RGB,255);
   color col = aaColor(c);
+  
+  //If there is a valid amino acid coloring, fill with the color
   if (col != color(0,0,0)){
     fill(col);
     rect(x,y,w,h);
   }
+  
+  //Black text label on top
   colorMode(HSB,1);
   stroke(0,0,0);
   fill(0,0,0);
