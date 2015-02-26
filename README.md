@@ -30,7 +30,7 @@ In addition, I implemented the alignment view to focus only on thirty amino acid
 Though I really wanted to have multiple alignments, I ran out of time to implement a non-naive method, but the Alignment class and rendering algorithm support this feature, so future work could add a similar multiple alignment viewer that works on the same principles. 
 
 ## 4. Running the Program
-The code for this program is  written in **assignment3.pde**. Open this file in processing. As with project 2, this project requires a dataset to first be read in. Change the value of DATA_FILE on line 11 to match the path to **dystrophin.fasta** on your filesystem:
+The code for this program is  written in **ass4.pde**. Open this file in processing. As with project 2, this project requires a dataset to first be read in. Change the value of DATA_FILE on line 11 to match the path to **dystrophin.fasta** on your filesystem:
 
 
 `final String DATA_FILE = "C:\\Users\\Tim\\Documents\\Biovis\\assignment4\\dystrophin.fasta";`
